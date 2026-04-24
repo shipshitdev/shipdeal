@@ -1,0 +1,26 @@
+{
+  "name": "@shipdeal/monorepo",
+  "private": true,
+  "packageManager": "bun@1.3.13",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:cli": "bun run --cwd apps/cli dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "dev:desktop": "bun run --cwd apps/desktop dev",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "deps:update": "bun update --latest",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.13",
+    "@types/node": "25.6.0",
+    "turbo": "2.9.6",
+    "typescript": "6.0.3"
+  }
+}

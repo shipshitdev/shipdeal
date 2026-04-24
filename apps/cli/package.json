@@ -1,0 +1,35 @@
+{
+  "name": "shipdeal",
+  "version": "0.0.1",
+  "description": "AI contract maker for consultants and agencies.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "shipdeal": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@shipdeal/contracts": "workspace:*",
+    "commander": "14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "tsup": "8.5.1",
+    "typescript": "6.0.3"
+  }
+}

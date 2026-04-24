@@ -1,0 +1,100 @@
+@import "tailwindcss";
+@source "../../../node_modules/@shipshitdev/ui/dist";
+@source "../../../packages/product/src";
+
+:root {
+  --bg-primary: #0b0c0a;
+  --bg-secondary: #121410;
+  --bg-tertiary: #1a1d17;
+  --bg-hover: #252a20;
+  --text-primary: #fbfbf3;
+  --text-secondary: #b5b8aa;
+  --text-muted: #7f8476;
+}
+
+@theme {
+  --color-border: #30362b;
+  --color-border-strong: #555d49;
+  --color-accent: #f2d16b;
+  --color-accent-hover: #ffe08a;
+  --color-accent-foreground: #14140f;
+  --color-success: #7ccf6f;
+  --color-warning: #f2bd5c;
+  --color-danger: #f07167;
+  --color-agent: #77b7c5;
+  --color-done: #c8a2ff;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+}
+
+@utility bg-primary { background-color: var(--bg-primary); }
+@utility bg-secondary { background-color: var(--bg-secondary); }
+@utility bg-tertiary { background-color: var(--bg-tertiary); }
+@utility bg-hover { background-color: var(--bg-hover); }
+@utility text-primary { color: var(--text-primary); }
+@utility text-secondary { color: var(--text-secondary); }
+@utility text-muted { color: var(--text-muted); }
+
+html { color-scheme: dark; }
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at top, rgba(242, 209, 107, 0.11), transparent 34%),
+    linear-gradient(135deg, rgba(242, 209, 107, 0.08), transparent 34rem),
+    linear-gradient(315deg, rgba(119, 183, 197, 0.08), transparent 32rem),
+    var(--bg-primary);
+  color: var(--text-primary);
+}
+
+body::after {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.03;
+  content: "";
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+code {
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.35rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes screenshotIn {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.75s ease-out;
+}
+
+.animate-screenshot-in {
+  animation: screenshotIn 0.9s ease-out;
+}

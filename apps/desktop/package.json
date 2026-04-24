@@ -1,0 +1,37 @@
+{
+  "name": "@shipdeal/desktop",
+  "version": "0.0.1",
+  "private": true,
+  "productName": "Shipdeal",
+  "main": "./dist/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "dist": "tsc && vite build && electron-builder",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist out"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "5.2.8",
+    "@shipdeal/contracts": "workspace:*",
+    "@shipdeal/product": "workspace:*",
+    "@shipshitdev/ui": "^0.4.8",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.2.4",
+    "@types/node": "25.6.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "electron": "41.3.0",
+    "electron-builder": "26.8.1",
+    "tailwindcss": "4.2.4",
+    "typescript": "6.0.3",
+    "vite": "8.0.10",
+    "vite-plugin-electron": "0.29.1",
+    "vite-plugin-electron-renderer": "0.14.6"
+  }
+}
