@@ -8,6 +8,7 @@ export default defineConfig({
   outDir: "dist",
   clean: true,
   noExternal: ["@shipdeal/contracts"],
+  external: ["puppeteer", "marked"],
   banner: {
     js: "#!/usr/bin/env node",
   },

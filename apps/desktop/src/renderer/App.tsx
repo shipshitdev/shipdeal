@@ -1,8 +1,12 @@
 import {
+	decod3rsProfile,
 	defaultContractDraftInput,
 	generateContractDraft,
+	templateIds,
 	type ContractDraftInput,
 	type GeneratedContract,
+	type ProviderProfile,
+	type TemplateId,
 } from "@shipdeal/contracts";
 import {
 	Badge,
@@ -50,7 +54,7 @@ import {
 	WandSparkles,
 } from "@shipshitdev/ui";
 import type { ComponentType } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type ViewMode = "overview" | "generator" | "inbox" | "settings";
 
@@ -493,25 +497,51 @@ function ContractPreview({
 	);
 }
 
-function GeneratorView() {
+function GeneratorView({ company }: { company: ProviderProfile }) {
 	const [input, setInput] = useState<ContractDraftInput>(defaultContractDraftInput);
 	const [generated, setGenerated] = useState<GeneratedContract>(() =>
-		generateContractDraft(defaultContractDraftInput),
+		generateContractDraft({ ...defaultContractDraftInput, providerOverride: company }),
 	);
 	const [savePath, setSavePath] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
 
-	const preview = useMemo(() => generateContractDraft(input), [input]);
+	const preview = useMemo(
+		() => generateContractDraft({ ...input, providerOverride: company }),
+		[input, company],
+	);
 
 	const update = (field: keyof ContractDraftInput, value: string) => {
 		setInput((current) => ({ ...current, [field]: value }));
 		setSavePath(null);
 	};
 
+	const updateTemplate = (value: string) => {
+		const next = (templateIds as readonly string[]).includes(value)
+			? (value as TemplateId)
+			: undefined;
+		setInput((current) => ({ ...current, template: next }));
+		setSavePath(null);
+	};
+
+	const updateCounterpartyPreset = (value: string) => {
+		setInput((current) => ({
+			...current,
+			counterparty: value || undefined,
+		}));
+		setSavePath(null);
+	};
+
+	const templateLabels: Record<TemplateId, string> = {
+		legacy: "Legacy single-page draft",
+		msa: "Master Services Agreement (MSA)",
+		"ai-architect": "AI Architect Consultancy (Vitae preset)",
+		"equity-side-letter": "Equity Side Letter (one-pager)",
+	};
+
 	const generate = async () => {
 		const next = window.shipdeal?.invoke
 			? await window.shipdeal.invoke("contract:generate", input)
-			: generateContractDraft(input);
+			: generateContractDraft({ ...input, providerOverride: company });
 		setGenerated(next);
 		setSavePath(null);
 	};
@@ -558,6 +588,37 @@ function GeneratorView() {
 								</CardDescription>
 							</CardHeader>
 							<CardContent>
+								<div className="mb-4 grid gap-4 md:grid-cols-2">
+									<div className="space-y-2">
+										<Label htmlFor="template">Template</Label>
+										<select
+											id="template"
+											className="h-9 w-full rounded-md border border-border bg-primary px-3 text-sm text-primary"
+											value={input.template ?? "legacy"}
+											onChange={(event) => updateTemplate(event.target.value)}
+										>
+											{templateIds.map((id) => (
+												<option key={id} value={id}>
+													{templateLabels[id]}
+												</option>
+											))}
+										</select>
+									</div>
+									<div className="space-y-2">
+										<Label htmlFor="counterparty">Counterparty preset</Label>
+										<select
+											id="counterparty"
+											className="h-9 w-full rounded-md border border-border bg-primary px-3 text-sm text-primary"
+											value={input.counterparty ?? ""}
+											onChange={(event) =>
+												updateCounterpartyPreset(event.target.value)
+											}
+										>
+											<option value="">None (use Client field)</option>
+											<option value="vitae-ai">Vitae AI Ltd. (London, UK)</option>
+										</select>
+									</div>
+								</div>
 								<div className="grid gap-4 md:grid-cols-2">
 									<div className="space-y-2">
 										<Label htmlFor="client">Client</Label>
@@ -696,6 +757,208 @@ function GeneratorView() {
 	);
 }
 
+function SettingsView({
+	company,
+	onSave,
+}: {
+	company: ProviderProfile;
+	onSave: (next: ProviderProfile) => Promise<void>;
+}) {
+	const [draft, setDraft] = useState<ProviderProfile>(company);
+	const [savedAt, setSavedAt] = useState<number | null>(null);
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		setDraft(company);
+	}, [company]);
+
+	const dirty = useMemo(
+		() => JSON.stringify(draft) !== JSON.stringify(company),
+		[draft, company],
+	);
+
+	const set = (field: keyof ProviderProfile, value: string) => {
+		setDraft((current) => ({ ...current, [field]: value }));
+		setSavedAt(null);
+	};
+
+	const setAddressLine = (index: number, value: string) => {
+		setDraft((current) => {
+			const next = [...current.address];
+			next[index] = value;
+			return { ...current, address: next };
+		});
+		setSavedAt(null);
+	};
+
+	const addAddressLine = () => {
+		setDraft((current) => ({ ...current, address: [...current.address, ""] }));
+	};
+
+	const removeAddressLine = (index: number) => {
+		setDraft((current) => ({
+			...current,
+			address: current.address.filter((_, i) => i !== index),
+		}));
+	};
+
+	const handleSave = async () => {
+		setSaving(true);
+		try {
+			const cleaned: ProviderProfile = {
+				...draft,
+				address: draft.address.map((l) => l.trim()).filter(Boolean),
+			};
+			await onSave(cleaned);
+			setDraft(cleaned);
+			setSavedAt(Date.now());
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	return (
+		<div className="flex flex-1 flex-col overflow-hidden">
+			<div className="flex items-center justify-between border-border border-b px-6 py-4">
+				<div>
+					<h1 className="text-base font-semibold text-primary">Settings</h1>
+					<p className="text-xs text-muted">
+						Company details used as the Service Provider in every generated contract.
+					</p>
+				</div>
+				<Button onClick={handleSave} disabled={!dirty || saving}>
+					<Download size={14} />
+					{saving ? "Saving…" : "Save company"}
+				</Button>
+			</div>
+			<div className="flex-1 overflow-y-auto px-6 py-6">
+				<div className="max-w-3xl space-y-6">
+					<Card>
+						<CardHeader>
+							<CardTitle>Company</CardTitle>
+							<CardDescription>
+								These values are merged into every contract you generate as the Service
+								Provider party. Stored locally on this machine.
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<div className="grid gap-4 md:grid-cols-2">
+								<div className="space-y-2">
+									<Label htmlFor="legalName">Legal name</Label>
+									<Input
+										id="legalName"
+										value={draft.legalName}
+										onChange={(e) => set("legalName", e.target.value)}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="shortName">Short name</Label>
+									<Input
+										id="shortName"
+										value={draft.shortName}
+										onChange={(e) => set("shortName", e.target.value)}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="registration">Company registration</Label>
+									<Input
+										id="registration"
+										value={draft.registration ?? ""}
+										onChange={(e) => set("registration", e.target.value)}
+										placeholder="MT C 103670"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="vatNumber">VAT number</Label>
+									<Input
+										id="vatNumber"
+										value={draft.vatNumber ?? ""}
+										onChange={(e) => set("vatNumber", e.target.value)}
+										placeholder="MT29707136"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="signatoryName">Signatory name</Label>
+									<Input
+										id="signatoryName"
+										value={draft.signatoryName}
+										onChange={(e) => set("signatoryName", e.target.value)}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="signatoryRole">Signatory role</Label>
+									<Input
+										id="signatoryRole"
+										value={draft.signatoryRole}
+										onChange={(e) => set("signatoryRole", e.target.value)}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="contactEmail">Contact email</Label>
+									<Input
+										id="contactEmail"
+										value={draft.contactEmail}
+										onChange={(e) => set("contactEmail", e.target.value)}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="jurisdiction">Jurisdiction</Label>
+									<Input
+										id="jurisdiction"
+										value={draft.jurisdiction}
+										onChange={(e) => set("jurisdiction", e.target.value)}
+									/>
+								</div>
+							</div>
+							<div className="mt-4 space-y-2">
+								<div className="flex items-center justify-between">
+									<Label>Registered address</Label>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={addAddressLine}
+										type="button"
+									>
+										<Plus size={13} />
+										Add line
+									</Button>
+								</div>
+								<div className="space-y-2">
+									{draft.address.map((line, index) => (
+										<div key={index} className="flex items-center gap-2">
+											<Input
+												value={line}
+												onChange={(e) => setAddressLine(index, e.target.value)}
+												placeholder={
+													index === 0 ? "Street + number" : "Address line"
+												}
+											/>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => removeAddressLine(index)}
+												type="button"
+												disabled={draft.address.length <= 1}
+											>
+												Remove
+											</Button>
+										</div>
+									))}
+								</div>
+							</div>
+							{savedAt ? (
+								<div className="mt-4 rounded-md border border-success/30 bg-success/5 px-3 py-2 text-[11px] text-success">
+									Saved. New values apply on the next contract generation.
+								</div>
+							) : null}
+						</CardContent>
+					</Card>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function PlaceholderView({ title }: { title: string }) {
 	return (
 		<div className="flex flex-1 items-center justify-center p-8">
@@ -723,6 +986,24 @@ export function App() {
 	const [viewMode, setViewMode] = useState<ViewMode>("generator");
 	const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const [company, setCompany] = useState<ProviderProfile>(decod3rsProfile);
+
+	useEffect(() => {
+		if (!window.shipdeal?.invoke) return;
+		window.shipdeal
+			.invoke("settings:get-company", undefined)
+			.then((value) => {
+				if (value) setCompany(value as ProviderProfile);
+			})
+			.catch(() => {});
+	}, []);
+
+	const saveCompany = async (next: ProviderProfile) => {
+		if (window.shipdeal?.invoke) {
+			await window.shipdeal.invoke("settings:set-company", { company: next });
+		}
+		setCompany(next);
+	};
 
 	return (
 		<div className="flex h-screen flex-col overflow-hidden bg-primary text-primary">
@@ -737,11 +1018,11 @@ export function App() {
 				{viewMode === "overview" ? (
 					<OverviewDashboard onNewContract={() => setViewMode("generator")} />
 				) : viewMode === "generator" ? (
-					<GeneratorView />
+					<GeneratorView company={company} />
 				) : viewMode === "inbox" ? (
 					<PlaceholderView title="Inbox" />
 				) : (
-					<PlaceholderView title="Settings" />
+					<SettingsView company={company} onSave={saveCompany} />
 				)}
 			</div>
 			<NewCustomerModal

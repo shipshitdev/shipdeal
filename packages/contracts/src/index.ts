@@ -1,3 +1,12 @@
+import { resolveCounterparty, type CounterpartyProfile } from "./counterparty";
+import { slugify, todayIso } from "./helpers";
+import { resolveProvider, type ProviderProfile } from "./provider";
+import {
+	isTemplateId,
+	templates,
+	type TemplateId,
+} from "./templates";
+
 export type ContractDraftInput = {
 	client: string;
 	contractType: string;
@@ -7,6 +16,10 @@ export type ContractDraftInput = {
 	jurisdiction: string;
 	paymentTerms: string;
 	startDate: string;
+	template?: TemplateId;
+	counterparty?: string;
+	provider?: string;
+	providerOverride?: ProviderProfile;
 };
 
 export type GeneratedContract = {
@@ -28,12 +41,8 @@ export const defaultContractDraftInput: ContractDraftInput = {
 	startDate: "To be confirmed",
 };
 
-export function slugifyContractPart(value: string) {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 80);
+export function slugifyContractPart(value: string): string {
+	return slugify(value);
 }
 
 export function normalizeContractDraftInput(
@@ -51,18 +60,73 @@ export function normalizeContractDraftInput(
 		paymentTerms:
 			input.paymentTerms?.trim() || defaultContractDraftInput.paymentTerms,
 		startDate: input.startDate?.trim() || defaultContractDraftInput.startDate,
+		template: isTemplateId(input.template) ? input.template : undefined,
+		counterparty: input.counterparty?.trim() || undefined,
+		provider: input.provider?.trim() || undefined,
+		providerOverride: input.providerOverride,
 	};
 }
+
+export { templateIds, isTemplateId, type TemplateId } from "./templates";
+export {
+	type ProviderProfile,
+	resolveProvider,
+	decod3rsProfile,
+} from "./provider";
+export {
+	type CounterpartyProfile,
+	resolveCounterparty,
+	vitaeAiProfile,
+} from "./counterparty";
 
 export function generateContractDraft(
 	input: Partial<ContractDraftInput>,
 ): GeneratedContract {
 	const contract = normalizeContractDraftInput(input);
-	const generatedAt = new Date().toISOString().slice(0, 10);
+	const template = contract.template ?? "legacy";
+
+	if (template === "legacy") {
+		return renderLegacyTemplate(contract);
+	}
+
+	const provider: ProviderProfile =
+		contract.providerOverride ?? resolveProvider(contract.provider);
+	const counterparty: CounterpartyProfile = resolveCounterparty(
+		contract.counterparty,
+		contract.client,
+	);
+
+	const renderer = templates[template];
+	const markdown = renderer({
+		provider,
+		counterparty,
+		effectiveDate: contract.startDate,
+		paymentTerms: contract.paymentTerms,
+	});
+
+	const titlePrefix =
+		template === "msa"
+			? "Master Services Agreement"
+			: template === "ai-architect"
+				? "AI Architect Consultancy Agreement"
+				: "Equity Side Letter";
+	const title = `${titlePrefix} — ${counterparty.legalName}`;
+	const fileName = `${slugify(provider.shortName)}-${slugify(template)}-${slugify(counterparty.legalName)}.md`;
+
+	const summary = [
+		`${provider.legalName} → ${counterparty.legalName}`,
+		titlePrefix,
+		provider.jurisdiction,
+		contract.startDate,
+	];
+
+	return { title, fileName, markdown, summary };
+}
+
+function renderLegacyTemplate(contract: ContractDraftInput): GeneratedContract {
+	const generatedAt = todayIso();
 	const title = `${contract.contractType} for ${contract.client}`;
-	const fileName = `${slugifyContractPart(contract.client)}-${slugifyContractPart(
-		contract.contractType,
-	)}.md`;
+	const fileName = `${slugify(contract.client)}-${slugify(contract.contractType)}.md`;
 
 	const markdown = `# ${contract.contractType}
 

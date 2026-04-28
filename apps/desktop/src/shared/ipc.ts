@@ -1,4 +1,18 @@
-import type { ContractDraftInput, GeneratedContract } from "@shipdeal/contracts";
+import type {
+	ContractDraftInput,
+	GeneratedContract,
+	ProviderProfile,
+} from "@shipdeal/contracts";
+
+export type DraftRecord = GeneratedContract & {
+	id: string;
+	companyId: string | null;
+	templateId: string;
+	counterparty: string | null;
+	client: string | null;
+	input: Partial<ContractDraftInput>;
+	createdAt: string;
+};
 
 export type ShipdealInvokeMap = {
 	"contract:generate": {
@@ -12,6 +26,22 @@ export type ShipdealInvokeMap = {
 	"shell:open-path": {
 		args: { path: string };
 		result: void;
+	};
+	"settings:get-company": {
+		args: undefined;
+		result: ProviderProfile;
+	};
+	"settings:set-company": {
+		args: { company: ProviderProfile };
+		result: { ok: true };
+	};
+	"drafts:list": {
+		args: undefined;
+		result: DraftRecord[];
+	};
+	"drafts:delete": {
+		args: { id: string };
+		result: { ok: true };
 	};
 };
 

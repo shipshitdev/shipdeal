@@ -1,7 +1,11 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { generateContractDraft } from "@shipdeal/contracts";
+import {
+	generateContractDraft,
+	isTemplateId,
+	type TemplateId,
+} from "@shipdeal/contracts";
 import { Command } from "commander";
 
 const require = createRequire(import.meta.url);
@@ -18,11 +22,27 @@ type DraftOptions = {
 	startDate?: string;
 	output?: string;
 	print?: boolean;
+	template?: string;
+	counterparty?: string;
+	provider?: string;
+	pdf?: boolean;
 };
 
 const DEFAULT_OUTPUT_DIR = "shipdeal-contracts";
 
-function writeDraft(options: DraftOptions) {
+function resolveTemplate(value?: string): TemplateId | undefined {
+	if (!value) return undefined;
+	if (!isTemplateId(value)) {
+		throw new Error(
+			`Unknown template "${value}". Expected one of: legacy, msa, ai-architect.`,
+		);
+	}
+	return value;
+}
+
+async function writeDraft(options: DraftOptions) {
+	const template = resolveTemplate(options.template);
+
 	const contract = generateContractDraft({
 		client: options.client,
 		contractType: options.type,
@@ -32,6 +52,9 @@ function writeDraft(options: DraftOptions) {
 		jurisdiction: options.jurisdiction,
 		paymentTerms: options.paymentTerms,
 		startDate: options.startDate,
+		template,
+		counterparty: options.counterparty,
+		provider: options.provider,
 	});
 
 	if (options.print) {
@@ -46,6 +69,25 @@ function writeDraft(options: DraftOptions) {
 	mkdirSync(dirname(outputPath), { recursive: true });
 	writeFileSync(outputPath, contract.markdown);
 	console.log(`Created ${outputPath}`);
+
+	if (options.pdf) {
+		const pdfPath = outputPath.replace(/\.md$/i, ".pdf");
+		try {
+			const { markdownToPdf } = await import("@shipdeal/contracts/pdf");
+			const buffer = await markdownToPdf(contract.markdown, {
+				title: contract.title,
+			});
+			writeFileSync(pdfPath, buffer);
+			console.log(`Created ${pdfPath}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`PDF generation failed: ${message}`);
+			console.error(
+				"Hint: ensure puppeteer is installed and run `bunx puppeteer browsers install chrome`.",
+			);
+			process.exitCode = 1;
+		}
+	}
 }
 
 function initWorkspace() {
@@ -79,6 +121,16 @@ program
 	.option("--start-date <date>", "expected start date")
 	.option("-o, --output <path>", "output Markdown path")
 	.option("--print", "print the generated draft instead of writing a file")
+	.option(
+		"--template <id>",
+		"contract template: legacy | msa | ai-architect",
+	)
+	.option(
+		"--counterparty <slug>",
+		"counterparty preset (e.g. vitae-ai)",
+	)
+	.option("--provider <slug>", "provider preset (default: decod3rs)")
+	.option("--pdf", "also emit a PDF next to the Markdown file")
 	.action(writeDraft);
 
 program.parse();

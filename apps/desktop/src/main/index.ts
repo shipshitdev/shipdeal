@@ -1,6 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
-import { generateContractDraft } from "@shipdeal/contracts";
+import {
+	decod3rsProfile,
+	generateContractDraft,
+	type ProviderProfile,
+} from "@shipdeal/contracts";
+import {
+	CompaniesQueries,
+	DraftsQueries,
+	closeDatabase,
+	getDatabase,
+} from "@shipdeal/db";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
 app.setName("Shipdeal");
@@ -16,10 +26,80 @@ function requireMainWindow() {
 	return mainWindow;
 }
 
+function db() {
+	return getDatabase(app.getPath("userData"));
+}
+
+function legacyCompanyJsonPath(): string {
+	return path.join(app.getPath("userData"), "company.json");
+}
+
+function migrateLegacyCompanyJson() {
+	const legacyPath = legacyCompanyJsonPath();
+	if (!fs.existsSync(legacyPath)) return;
+	if (CompaniesQueries.getActive(db())) {
+		fs.renameSync(legacyPath, `${legacyPath}.migrated`);
+		return;
+	}
+	try {
+		const raw = fs.readFileSync(legacyPath, "utf-8");
+		const parsed = JSON.parse(raw) as Partial<ProviderProfile>;
+		const merged: ProviderProfile = { ...decod3rsProfile, ...parsed };
+		CompaniesQueries.upsertActive(db(), merged);
+		fs.renameSync(legacyPath, `${legacyPath}.migrated`);
+	} catch (err) {
+		console.error("Failed to migrate company.json", err);
+	}
+}
+
+function loadCompany(): ProviderProfile {
+	const stored = CompaniesQueries.getActive(db());
+	if (stored) {
+		const { id: _id, createdAt: _c, updatedAt: _u, ...profile } = stored;
+		return profile;
+	}
+	return decod3rsProfile;
+}
+
+function saveCompany(company: ProviderProfile) {
+	CompaniesQueries.upsertActive(db(), company);
+}
+
 function registerIpcHandlers() {
-	ipcMain.handle("contract:generate", (_event, args) =>
-		generateContractDraft(args ?? {}),
-	);
+	ipcMain.handle("contract:generate", (_event, args) => {
+		const provider = loadCompany();
+		const input = { ...(args ?? {}), providerOverride: provider };
+		const contract = generateContractDraft(input);
+		const active = CompaniesQueries.getActive(db());
+		try {
+			DraftsQueries.create(db(), {
+				companyId: active?.id ?? null,
+				input,
+				contract,
+			});
+		} catch (err) {
+			console.error("Failed to persist draft", err);
+		}
+		return contract;
+	});
+
+	ipcMain.handle("settings:get-company", () => loadCompany());
+
+	ipcMain.handle("settings:set-company", (_event, args) => {
+		const company = args?.company;
+		if (!company?.legalName) throw new Error("Invalid company payload");
+		saveCompany(company);
+		return { ok: true };
+	});
+
+	ipcMain.handle("drafts:list", () => DraftsQueries.list(db()));
+
+	ipcMain.handle("drafts:delete", (_event, args) => {
+		const id = args?.id;
+		if (typeof id !== "string" || !id) throw new Error("Missing draft id");
+		DraftsQueries.delete(db(), id);
+		return { ok: true };
+	});
 
 	ipcMain.handle("contract:save-draft", async (_event, args) => {
 		const contract = args?.contract;
@@ -97,6 +177,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+	migrateLegacyCompanyJson();
 	registerIpcHandlers();
 
 	const menu = Menu.buildFromTemplate([
@@ -164,4 +245,8 @@ app.on("activate", () => {
 	if (BrowserWindow.getAllWindows().length === 0) {
 		createWindow();
 	}
+});
+
+app.on("before-quit", () => {
+	closeDatabase();
 });

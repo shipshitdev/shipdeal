@@ -1,0 +1,28 @@
+{
+	"name": "@shipdeal/db",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"scripts": {
+		"build": "tsc --project tsconfig.build.json",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"clean": "rm -rf dist"
+	},
+	"dependencies": {
+		"@shipdeal/contracts": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.4",
+		"@vitest/coverage-v8": "^4.1.5",
+		"typescript": "6.0.3",
+		"vitest": "^4.1.5"
+	}
+}
